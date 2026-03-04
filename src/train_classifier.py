@@ -11,6 +11,7 @@ from tqdm.auto import tqdm
 from src.datasets.emnist import make_emnist_dataloaders
 from src.models.classifier_cnn import ClassifierCNN
 from src.utils.io import append_metrics_csv, ensure_dir, save_json
+from src.utils.runtime import resolve_num_workers
 from src.utils.seed import set_global_seed
 from src.utils.synthetic import make_fake_emnist_loaders
 
@@ -77,16 +78,19 @@ def main() -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     out_dir = ensure_dir(args.out_dir)
-    save_json(out_dir / "config.json", vars(args))
+    num_workers = resolve_num_workers(args.num_workers, log_prefix="Classifier")
+    config = vars(args).copy()
+    config["effective_num_workers"] = num_workers
+    save_json(out_dir / "config.json", config)
 
     if args.synthetic_smoke:
-        loaders = make_fake_emnist_loaders(batch_size=args.batch_size, seed=args.seed, num_workers=args.num_workers)
+        loaders = make_fake_emnist_loaders(batch_size=args.batch_size, seed=args.seed, num_workers=num_workers)
     else:
         loaders = make_emnist_dataloaders(
             data_dir=args.data_dir,
             batch_size=args.batch_size,
             seed=args.seed,
-            num_workers=args.num_workers,
+            num_workers=num_workers,
             download=True,
         )
 
@@ -126,7 +130,7 @@ def main() -> None:
             "model_state": model.state_dict(),
             "optimizer_state": optimizer.state_dict(),
             "val_acc": val_acc,
-            "config": vars(args),
+            "config": config,
         }
         torch.save(ckpt, out_dir / "last.pt")
 

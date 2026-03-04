@@ -44,6 +44,8 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
+On macOS, the training entrypoints automatically fall back to `num_workers=0` to avoid PyTorch `DataLoader` worker hangs.
+
 ## Training and Evaluation Commands
 
 Run from repository root (`handwriting-gen/`).

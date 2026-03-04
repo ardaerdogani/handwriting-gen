@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import platform
 from pathlib import Path
 
 import torch
@@ -17,6 +16,7 @@ from src.datasets.emnist_to_strokes import (
 from src.models.rnn_mdn import RNNMDN, generate_unconditional, mdn_nll, pen_bce_loss
 from src.utils.io import append_metrics_csv, ensure_dir, save_json
 from src.utils.render import plot_stroke_sequences, render_sequences_to_tensor, save_tensor_grid
+from src.utils.runtime import resolve_num_workers
 from src.utils.seed import set_global_seed
 from src.utils.synthetic import make_fake_stroke_loaders
 
@@ -159,12 +159,10 @@ def main() -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     out_dir = ensure_dir(args.out_dir)
-    save_json(out_dir / "config.json", vars(args))
-
-    num_workers = args.num_workers
-    if num_workers > 0 and platform.system() == "Darwin":
-        print("[RNN] For macOS, setting num_workers=0 to avoid DataLoader worker hangs.")
-        num_workers = 0
+    num_workers = resolve_num_workers(args.num_workers, log_prefix="RNN")
+    config = vars(args).copy()
+    config["effective_num_workers"] = num_workers
+    save_json(out_dir / "config.json", config)
 
     if args.synthetic_smoke:
         loaders = make_fake_stroke_loaders(
@@ -243,7 +241,7 @@ def main() -> None:
             "model_state": model.state_dict(),
             "optimizer_state": optimizer.state_dict(),
             "val_loss": val_loss,
-            "config": vars(args),
+            "config": config,
         }
         torch.save(checkpoint, out_dir / "last.pt")
         if val_loss < best_val:
